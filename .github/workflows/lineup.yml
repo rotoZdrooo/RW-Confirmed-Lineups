@@ -5,6 +5,9 @@ on:
     types: [check-lineups]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 concurrency:
   group: confirmed-lineups
   cancel-in-progress: true
