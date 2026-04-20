@@ -31,7 +31,6 @@ POSITION_ORDER = {
 
 
 
-
 def load_posted():
     if os.path.exists(STATE_FILE):
         with open(STATE_FILE, "r") as f:
@@ -42,11 +41,9 @@ def load_posted():
 
 
 
-
 def save_posted(data):
     with open(STATE_FILE, "w") as f:
         json.dump(data, f, indent=2)
-
 
 
 
@@ -59,7 +56,6 @@ def fetch_lineups():
     except Exception as e:
         print(f"[ERROR] Failed to fetch lineups: {e}")
         return None
-
 
 
 
@@ -86,7 +82,6 @@ def parse_kickoff(date_str):
 
 
 
-
 def has_games_today(root):
     """Check if there are any EPL games today (ET date, since API times are ET)."""
     games_el = root.find("Games")
@@ -98,7 +93,6 @@ def has_games_today(root):
         if kickoff and kickoff.date() == today_utc:
             return True
     return False
-
 
 
 
@@ -116,13 +110,11 @@ def hash_players(players_xml):
 
 
 
-
 def sort_players(players):
     def key(p):
         pos = p.findtext("GamePosition", p.findtext("Position", "")).strip().upper()
         return POSITION_ORDER.get(pos, 99)
     return sorted(players, key=key)
-
 
 
 
@@ -133,12 +125,10 @@ def clean_cdata(text):
 
 
 
-
 def format_kickoff(dt):
     et = dt.astimezone(TZ_ET).strftime("%a %b %-d, %-I:%M %p ET")
     uk = dt.astimezone(TZ_UK).strftime("%H:%M UK")
     return f"{et}  |  {uk}"
-
 
 
 
@@ -153,8 +143,7 @@ def fmt_player(p):
     name    = nickname if nickname else f"{firstname} {lastname}".strip()
     pos     = game_pos or position
     pos_str = f" `{pos}`" if pos else ""
-    return f"â¢ {name}{pos_str}"
-
+    return f"• {name}{pos_str}"
 
 
 
@@ -164,13 +153,13 @@ def build_discord_message(team_el, home_name, away_name, kickoff):
 
 
     lines = []
-    lines.append(f"**{away_name}  âï¸  vs  ð   {home_name}**")
+    lines.append(f"**{away_name}  ✈️  vs  🏠  {home_name}**")
     if kickoff:
-        lines.append(f"ðï¸  {format_kickoff(kickoff)}")
+        lines.append(f"🗓️  {format_kickoff(kickoff)}")
     lines.append("")
 
 
-    lines.append(f"â  **{team_name}** â *Confirmed*")
+    lines.append(f"✅  **{team_name}** — *Confirmed*")
     lines.append("")
 
 
@@ -181,27 +170,26 @@ def build_discord_message(team_el, home_name, away_name, kickoff):
 
 
         if starters:
-            lines.append("**â½  Starting XI**")
+            lines.append("**⚽  Starting XI**")
             for p in starters:
                 lines.append(f"  {fmt_player(p)}")
             lines.append("")
 
 
         if bench:
-            lines.append("**ðª  Bench**")
+            lines.append("**🪑  Bench**")
             for p in bench:
                 lines.append(f"  {fmt_player(p)}")
             lines.append("")
 
 
-    lines.append(f"ð  [Full EPL Lineups]({ROTOWIRE_LINEUPS_URL})")
+    lines.append(f"🔗  [Full EPL Lineups]({ROTOWIRE_LINEUPS_URL})")
 
 
     message = "\n".join(lines)
     if len(message) > 1900:
         message = message[:1897] + "..."
     return message
-
 
 
 
@@ -212,7 +200,6 @@ def post_to_discord(message):
         r.raise_for_status()
     except Exception as e:
         print(f"[ERROR] Discord post failed: {e}")
-
 
 
 
@@ -236,7 +223,7 @@ def main():
 
     # Exit early if no EPL games today (international break etc.)
     if not has_games_today(root):
-        print("No EPL games today â exiting.")
+        print("No EPL games today — exiting.")
         return
 
 
@@ -252,11 +239,11 @@ def main():
 
 
     if not games_in_window:
-        print("No games within 3 hour window â exiting.")
+        print("No games within 3 hour window — exiting.")
         return
 
 
-    print(f"{len(games_in_window)} game(s) in window â checking confirmed lineups...")
+    print(f"{len(games_in_window)} game(s) in window — checking confirmed lineups...")
 
 
     posted        = load_posted()
@@ -290,7 +277,7 @@ def main():
 
 
             if lineup_status != "C":
-                print(f"[SKIP] {clean_cdata(team_el.findtext('Name', team_id))} â status '{lineup_status}'")
+                print(f"[SKIP] {clean_cdata(team_el.findtext('Name', team_id))} — status '{lineup_status}'")
                 continue
 
 
@@ -318,7 +305,6 @@ def main():
         print("No new confirmed lineups.")
     else:
         print(f"Done. Posted/updated {updated_count} confirmed lineup(s).")
-
 
 
 
