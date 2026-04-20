@@ -35,10 +35,10 @@ jobs:
           done
 
           if [ "$FUTURE_GAME" = true ]; then
-            echo "Games today that haven't kicked off yet â proceeding."
+            echo "Games today that have not kicked off yet -- proceeding."
             echo "has_games=true" >> $GITHUB_OUTPUT
           else
-            echo "All games done or no games today â disabling poller."
+            echo "All games done or no games today -- disabling poller."
             echo "has_games=false" >> $GITHUB_OUTPUT
             curl -s -X PATCH \
               -H "Content-Type: application/json" \
