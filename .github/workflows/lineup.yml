@@ -1,0 +1,78 @@
+name: EPL Confirmed Lineups Bot
+
+on:
+  repository_dispatch:
+    types: [check-lineups]
+  workflow_dispatch:
+
+concurrency:
+  group: confirmed-lineups
+  cancel-in-progress: true
+
+jobs:
+  run-lineup-bot:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check for upcoming games
+        id: gate
+        env:
+          ROTOWIRE_KEY: ${{ secrets.ROTOWIRE_KEY }}
+          CRONJOB_API_KEY: ${{ secrets.CRONJOB_API_KEY }}
+          CRONJOB_POLLER_ID: ${{ secrets.CRONJOB_POLLER_ID }}
+        run: |
+          RESP=$(curl -s "https://api.rotowire.com/Soccer/EPL/Lineups.php?key=$ROTOWIRE_KEY")
+          TODAY=$(TZ=America/New_York date +%Y-%m-%d)
+          NOW_EPOCH=$(date -u +%s)
+
+          FUTURE_GAME=false
+          for KICKOFF in $(echo "$RESP" | grep -oP "Date=\"${TODAY}T[^\"]+\"" | grep -oP "${TODAY}T[^\"]+"); do
+            KICK_EPOCH=$(date -u -d "$KICKOFF" +%s 2>/dev/null || echo "0")
+            if [ "$KICK_EPOCH" -gt "$NOW_EPOCH" ]; then
+              FUTURE_GAME=true
+              break
+            fi
+          done
+
+          if [ "$FUTURE_GAME" = true ]; then
+            echo "Games today that haven't kicked off yet â proceeding."
+            echo "has_games=true" >> $GITHUB_OUTPUT
+          else
+            echo "All games done or no games today â disabling poller."
+            echo "has_games=false" >> $GITHUB_OUTPUT
+            curl -s -X PATCH \
+              -H "Content-Type: application/json" \
+              -H "Authorization: Bearer $CRONJOB_API_KEY" \
+              -d '{"job":{"enabled":false}}' \
+              "https://api.cron-job.org/jobs/$CRONJOB_POLLER_ID"
+          fi
+
+      - name: Checkout repo
+        if: steps.gate.outputs.has_games == 'true'
+        uses: actions/checkout@v4.2.2
+
+      - name: Set up Python
+        if: steps.gate.outputs.has_games == 'true'
+        uses: actions/setup-python@v5.4.0
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        if: steps.gate.outputs.has_games == 'true'
+        run: pip install -r requirements.txt
+
+      - name: Run lineup bot
+        if: steps.gate.outputs.has_games == 'true'
+        env:
+          ROTOWIRE_KEY: ${{ secrets.ROTOWIRE_KEY }}
+          DISCORD_WEBHOOK_CONFIRMED: ${{ secrets.DISCORD_WEBHOOK_CONFIRMED }}
+        run: python lineup_bot.py
+
+      - name: Commit updated state file
+        if: steps.gate.outputs.has_games == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add posted_lineups.json
+          git diff --cached --quiet || git commit -m "Update posted_lineups.json [skip ci]"
+          git push
