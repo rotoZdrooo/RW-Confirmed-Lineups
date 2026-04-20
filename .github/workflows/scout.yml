@@ -1,4 +1,4 @@
-name: EPL Game Day Scout
+name: Morning Scout
 
 on:
   repository_dispatch:
@@ -6,39 +6,39 @@ on:
   workflow_dispatch:
 
 jobs:
-  check-gameday:
+  scout:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Check for upcoming games
+      - name: Check for EPL games today
         env:
           ROTOWIRE_KEY: ${{ secrets.ROTOWIRE_KEY }}
           CRONJOB_API_KEY: ${{ secrets.CRONJOB_API_KEY }}
           CRONJOB_POLLER_ID: ${{ secrets.CRONJOB_POLLER_ID }}
         run: |
-          RESP=$(curl -s "https://api.rotowire.com/Soccer/EPL/Lineups.php?key=$ROTOWIRE_KEY")
-          TODAY=$(TZ=America/New_York date +%Y-%m-%d)
-          NOW_EPOCH=$(date -u +%s)
-          WINDOW=10800  # 3 hours in seconds
+          XML=$(curl -sf "https://api.rotowire.com/Soccer/EPL/Lineups.php?key=$ROTOWIRE_KEY")
+          if [ -z "$XML" ]; then
+            echo "Failed to fetch lineups XML"
+            exit 1
+          fi
 
-          # Check if any game today has a kickoff within the next 3 hours
-          GAME_SOON=false
-          for KICKOFF in $(echo "$RESP" | grep -oP "Date=\"${TODAY}T[^\"]+\"" | grep -oP "${TODAY}T[^\"]+"); do
-            KICK_EPOCH=$(date -u -d "$KICKOFF" +%s 2>/dev/null || echo "0")
-            TIME_UNTIL=$((KICK_EPOCH - NOW_EPOCH))
-            if [ "$TIME_UNTIL" -gt 0 ] && [ "$TIME_UNTIL" -le "$WINDOW" ]; then
-              GAME_SOON=true
+          TODAY_UTC=$(date -u +%Y-%m-%d)
+          GAME_DATES=$(echo "$XML" | grep -oP 'Date="\K[^"]+' || true)
+
+          FOUND=false
+          for D in $GAME_DATES; do
+            GAME_DAY=$(echo "$D" | cut -dT -f1)
+            if [ "$GAME_DAY" = "$TODAY_UTC" ]; then
+              FOUND=true
               break
             fi
           done
 
-          if [ "$GAME_SOON" = true ]; then
-            echo "Game within 3 hours â enabling the lineup poller."
-            curl -s -X PATCH \
+          if [ "$FOUND" = true ]; then
+            echo "Game today -- enabling the lineup poller."
+            curl -sf -X PATCH "https://api.cron-job.org/jobs/$CRONJOB_POLLER_ID" \
               -H "Content-Type: application/json" \
               -H "Authorization: Bearer $CRONJOB_API_KEY" \
-              -d '{"job":{"enabled":true}}' \
-              "https://api.cron-job.org/jobs/$CRONJOB_POLLER_ID"
+              -d '{"job":{"enabled":true}}'
           else
-            echo "No games within 3 hours â poller stays off."
+            echo "No games today -- poller stays off."
           fi
