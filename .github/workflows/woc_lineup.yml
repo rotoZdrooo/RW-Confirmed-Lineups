@@ -70,7 +70,7 @@ jobs:
           ROTOWIRE_KEY_WOC: ${{ secrets.ROTOWIRE_KEY_WOC }}
           DISCORD_WEBHOOK_WOC_PREDICTED: ${{ secrets.DISCORD_WEBHOOK_WOC_PREDICTED }}
           DISCORD_WEBHOOK_WOC_CONFIRMED: ${{ secrets.DISCORD_WEBHOOK_WOC_CONFIRMED }}
-        run: python woc_lineup_bot.py
+        run: python woc_confirmed_bot.py
 
       - name: Commit updated state file
         if: steps.gate.outputs.has_games == 'true'
