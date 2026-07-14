@@ -53,7 +53,14 @@ def save_state(state: dict):
         json.dump(state, f, indent=2)
 
 def lineup_hash(players: list) -> str:
-    key = json.dumps(players, sort_keys=True)
+    # Sort players into a canonical order so a pure reordering by the feed
+    # (e.g. two players sharing the same position swapping places) does not
+    # change the hash and trigger a duplicate re-post.
+    canonical = sorted(
+        players,
+        key=lambda p: (p.get("name", ""), p.get("pos", ""), p.get("gpos", "")),
+    )
+    key = json.dumps(canonical, sort_keys=True)
     return hashlib.md5(key.encode()).hexdigest()
 
 # ── Fetch lineups ─────────────────────────────────────────────────────────────
